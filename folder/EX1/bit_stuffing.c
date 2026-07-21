@@ -1,26 +1,54 @@
 #include <stdio.h>
 #include <string.h>
 
+int isBinary(char str[])
+{
+    int i;
+
+    if(str[0] == '\0')
+        return 0;
+
+    for(i = 0; str[i] != '\0'; i++)
+    {
+        if(str[i] != '0' && str[i] != '1')
+            return 0;
+    }
+
+    return 1;
+}
+
 int main()
 {
-    char text[100];
+    char input[100];
     char binary[1000] = "";
-    char stuffed[1500], destuffed[1000];
+    char stuffed[1500];
+    char destuffed[1000];
     char ch;
+
     int i, j, count;
     int pos, len;
 
-    printf("Enter Text Data : ");
-    scanf("%s", text);
+    printf("Enter Data : ");
+    scanf("%99s", input);
 
-    for(i = 0; text[i] != '\0'; i++)
+    
+    if(isBinary(input))
     {
-        for(j = 7; j >= 0; j--)
+        strcpy(binary, input);
+        printf("\nInput Type       : Binary");
+    }
+    else
+    {
+        printf("\nInput Type       : Text");
+
+        for(i = 0; input[i] != '\0'; i++)
         {
-            char bit = ((text[i] >> j) & 1) + '0';
-            int l = strlen(binary);
-            binary[l] = bit;
-            binary[l + 1] = '\0';
+            for(j = 7; j >= 0; j--)
+            {
+                int l = strlen(binary);
+                binary[l] = ((input[i] >> j) & 1) + '0';
+                binary[l + 1] = '\0';
+            }
         }
     }
 
@@ -49,13 +77,13 @@ int main()
 
     stuffed[j] = '\0';
 
-    printf("\nBinary Data       : %s", binary);
-    printf("\nStuffed Data      : %s", stuffed);
+    printf("\nBinary Data      : %s", binary);
+    printf("\nStuffed Data     : %s", stuffed);
 
     printf("\n\nTransmitted Frame : ");
     printf("01111110 %s 01111110\n", stuffed);
 
-  
+   
     printf("\nDo you want to induce an error? (Y/N) : ");
     scanf(" %c", &ch);
 
@@ -93,7 +121,6 @@ int main()
     {
         printf("\nNo Error Introduced.");
 
-        
         count = 0;
         j = 0;
 
@@ -107,7 +134,7 @@ int main()
 
                 if(count == 5)
                 {
-                    i++; // Skip stuffed 0
+                    i++;   // Skip stuffed 0
                     count = 0;
                 }
             }
@@ -119,7 +146,7 @@ int main()
 
         destuffed[j] = '\0';
 
-        printf("\n\nReceiver Output   : %s\n", destuffed);
+        printf("\n\nReceiver Output  : %s\n", destuffed);
     }
 
     return 0;
