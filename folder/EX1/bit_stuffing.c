@@ -1,127 +1,109 @@
 #include <stdio.h>
-
-#define MAX 200
-
-void printBits(int arr[], int n)
-{
-    for(int i=0;i<n;i++)
-        printf("%d",arr[i]);
-    printf("\n");
-}
+#include <string.h>
 
 int main()
 {
-    int data[MAX], stuffed[MAX], framed[MAX], destuffed[MAX];
-    int flag[8]={0,1,1,1,1,1,1,0};
+    char data[100], stuffed[150], destuffed[100];
+    char ch;
+    int i, j = 0, count = 0;
+    int pos, len;
 
-    int n,i,j=0,ones=0;
+    printf("Enter Binary Data : ");
+    scanf("%s", data);
 
-    printf("Enter number of bits: ");
-    scanf("%d",&n);
-
-    printf("Enter data bits (0/1):\n");
-    for(i=0;i<n;i++)
-        scanf("%d",&data[i]);
-
-    printf("\nOriginal Data : ");
-    printBits(data,n);
-
-
-
-    ones=0;
-    j=0;
-
-    for(i=0;i<n;i++)
+    for(i = 0; data[i] != '\0'; i++)
     {
-        stuffed[j++]=data[i];
+        stuffed[j++] = data[i];
 
-        if(data[i]==1)
-            ones++;
-        else
-            ones=0;
-
-        if(ones==5)
+        if(data[i] == '1')
         {
-            stuffed[j++]=0;
-            ones=0;
-        }
-    }
+            count++;
 
-    int stuffedLen=j;
-
-    printf("Stuffed Data  : ");
-    printBits(stuffed,stuffedLen);
-
-
-
-    int k=0;
-
-    for(i=0;i<8;i++)
-        framed[k++]=flag[i];
-
-    for(i=0;i<stuffedLen;i++)
-        framed[k++]=stuffed[i];
-
-    for(i=0;i<8;i++)
-        framed[k++]=flag[i];
-
-    int frameLen=k;
-
-    printf("Framed Data   : ");
-    printBits(framed,frameLen);
-
-
-
-    j=0;
-    ones=0;
-
-    for(i=8;i<frameLen-8;i++)
-    {
-        if(framed[i]==1)
-        {
-            destuffed[j++]=1;
-            ones++;
-
-            if(ones==5)
+            if(count == 5)
             {
-                i++;
-                ones=0;
+                stuffed[j++] = '0';
+                count = 0;
             }
         }
         else
         {
-            destuffed[j++]=0;
-            ones=0;
+            count = 0;
         }
     }
 
-    int destuffLen=j;
+    stuffed[j] = '\0';
 
-    printf("Destuffed Data: ");
-    printBits(destuffed,destuffLen);
+    printf("\nOriginal Data      : %s", data);
+    printf("\nStuffed Data       : %s", stuffed);
 
+    printf("\n\nTransmitted Frame  : ");
+    printf("01111110 %s 01111110\n", stuffed);
 
+    printf("\nDo you want to induce an error? (Y/N) : ");
+    scanf(" %c", &ch);
 
-    int match=1;
+    if(ch == 'Y' || ch == 'y')
+    {
+        len = strlen(stuffed);
 
-    if(destuffLen!=n)
-        match=0;
+        printf("Enter Bit Position (1-%d) : ", len);
+        scanf("%d", &pos);
+
+        if(pos >= 1 && pos <= len)
+        {
+            if(stuffed[pos - 1] == '0')
+            {
+                stuffed[pos - 1] = '1';
+                printf("\nBit at Position %d changed from 0 to 1", pos);
+            }
+            else
+            {
+                stuffed[pos - 1] = '0';
+                printf("\nBit at Position %d changed from 1 to 0", pos);
+            }
+
+            printf("\n\nFrame After Error  : %s", stuffed);
+
+            printf("\n\nTransmission Error Detected");
+            printf("\nFrame Discarded");
+            printf("\nDe-Stuffing Not Performed\n");
+        }
+        else
+        {
+            printf("\nInvalid Bit Position.\n");
+        }
+    }
     else
     {
-        for(i=0;i<n;i++)
+        printf("\nNo Error Introduced.");
+
+        count = 0;
+        j = 0;
+
+        for(i = 0; stuffed[i] != '\0'; i++)
         {
-            if(data[i]!=destuffed[i])
+            destuffed[j++] = stuffed[i];
+
+            if(stuffed[i] == '1')
             {
-                match=0;
-                break;
+                count++;
+
+                if(count == 5)
+                {
+                    i++;        // Skip stuffed 0
+                    count = 0;
+                }
+            }
+            else
+            {
+                count = 0;
             }
         }
-    }
 
-    if(match)
-        printf("\nDestuffing Successful\n");
-    else
-        printf("\nData Mismatch\n");
+        destuffed[j] = '\0';
+
+        printf("\n\nReceiver Output    : %s\n", destuffed);
+    }
 
     return 0;
 }
