@@ -3,19 +3,35 @@
 
 int main()
 {
-    char data[100], stuffed[150], destuffed[100];
+    char text[100];
+    char binary[1000] = "";
+    char stuffed[1500], destuffed[1000];
     char ch;
-    int i, j = 0, count = 0;
+    int i, j, count;
     int pos, len;
 
-    printf("Enter Binary Data : ");
-    scanf("%s", data);
+    printf("Enter Text Data : ");
+    scanf("%s", text);
 
-    for(i = 0; data[i] != '\0'; i++)
+    for(i = 0; text[i] != '\0'; i++)
     {
-        stuffed[j++] = data[i];
+        for(j = 7; j >= 0; j--)
+        {
+            char bit = ((text[i] >> j) & 1) + '0';
+            int l = strlen(binary);
+            binary[l] = bit;
+            binary[l + 1] = '\0';
+        }
+    }
 
-        if(data[i] == '1')
+    j = 0;
+    count = 0;
+
+    for(i = 0; binary[i] != '\0'; i++)
+    {
+        stuffed[j++] = binary[i];
+
+        if(binary[i] == '1')
         {
             count++;
 
@@ -33,12 +49,13 @@ int main()
 
     stuffed[j] = '\0';
 
-    printf("\nOriginal Data      : %s", data);
-    printf("\nStuffed Data       : %s", stuffed);
+    printf("\nBinary Data       : %s", binary);
+    printf("\nStuffed Data      : %s", stuffed);
 
-    printf("\n\nTransmitted Frame  : ");
+    printf("\n\nTransmitted Frame : ");
     printf("01111110 %s 01111110\n", stuffed);
 
+  
     printf("\nDo you want to induce an error? (Y/N) : ");
     scanf(" %c", &ch);
 
@@ -51,18 +68,17 @@ int main()
 
         if(pos >= 1 && pos <= len)
         {
-            if(stuffed[pos - 1] == '0')
-            {
-                stuffed[pos - 1] = '1';
-                printf("\nBit at Position %d changed from 0 to 1", pos);
-            }
-            else
-            {
-                stuffed[pos - 1] = '0';
-                printf("\nBit at Position %d changed from 1 to 0", pos);
-            }
+            char oldBit = stuffed[pos - 1];
 
-            printf("\n\nFrame After Error  : %s", stuffed);
+            if(stuffed[pos - 1] == '0')
+                stuffed[pos - 1] = '1';
+            else
+                stuffed[pos - 1] = '0';
+
+            printf("\nBit at Position %d changed from %c to %c",
+                   pos, oldBit, stuffed[pos - 1]);
+
+            printf("\n\nFrame After Error : %s", stuffed);
 
             printf("\n\nTransmission Error Detected");
             printf("\nFrame Discarded");
@@ -77,6 +93,7 @@ int main()
     {
         printf("\nNo Error Introduced.");
 
+        
         count = 0;
         j = 0;
 
@@ -90,7 +107,7 @@ int main()
 
                 if(count == 5)
                 {
-                    i++;        // Skip stuffed 0
+                    i++; // Skip stuffed 0
                     count = 0;
                 }
             }
@@ -102,7 +119,7 @@ int main()
 
         destuffed[j] = '\0';
 
-        printf("\n\nReceiver Output    : %s\n", destuffed);
+        printf("\n\nReceiver Output   : %s\n", destuffed);
     }
 
     return 0;
