@@ -1,0 +1,376 @@
+[24bcs005@mepcolinux ex6]$cat 1.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#define DEFAULT_PORT 9090
+#define BUFFER_SIZE 1024
+int is_palindrome(const char *str)
+{
+    int left = 0;
+    int right = strlen(str) - 1;
+    while (left < right)
+    {
+        if (str[left] != str[right])
+            return 0;
+        left++;
+        right--;
+    }
+    return 1;
+}
+int verify_username(const char *username)
+{
+    FILE *fp;
+    char u[50], p[50];
+    fp = fopen("users.txt", "r");
+    if (fp == NULL)
+    {
+        return 0;
+    }
+    while (fscanf(fp, "%49s %49s", u, p) != EOF)
+    {
+        if (strcmp(u, username) == 0)
+        {
+            fclose(fp);
+            return 1;
+        }
+    }
+    fclose(fp);
+    return 0;
+}
+int verify_password(const char *username, const char *password)
+{
+    FILE *fp;
+    char u[50], p[50];
+    fp = fopen("users.txt", "r");
+    if (fp == NULL)
+    {
+        return 0;
+    }
+    while (fscanf(fp, "%49s %49s", u, p) != EOF)
+    {
+        if (strcmp(u, username) == 0 && strcmp(p, password) == 0)
+        {
+            fclose(fp);
+            return 1;
+        }
+    }
+    fclose(fp);
+    return 0;
+}
+void run_server(int port)
+{
+    int server_fd, client_fd;
+    struct sockaddr_in address;
+    int addrlen = sizeof(address);
+    char username[50];
+    char password[50];
+    char buffer[BUFFER_SIZE];
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0)
+    {
+        exit(EXIT_FAILURE);
+    }
+    int opt = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+#ifdef SO_REUSEPORT
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+#endif
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
+    {
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+    if (listen(server_fd, 3) < 0)
+    {
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+    printf("\n====================================\n");
+    printf(" SERVER STARTED\n");
+    printf("====================================\n");
+    printf("Server listening on port %d...\n", port);
+    client_fd = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen);
+    if (client_fd < 0)
+    {
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+    printf("Client connected successfully!\n");
+    memset(username, 0, sizeof(username));
+    int bytes_received = recv(client_fd, username, sizeof(username) - 1, 0);
+    if (bytes_received <= 0)
+    {
+        close(client_fd);
+        close(server_fd);
+        return;
+    }
+    printf("\nValidating username entry...\n");
+    if (!verify_username(username))
+    {
+        send(client_fd, "AUTH_FAIL", 9, 0);
+        printf("Username '%s' not found. Terminating connection.\n", username);
+        close(client_fd);
+        close(server_fd);
+        return;
+    }
+    send(client_fd, "USER_OK", 7, 0);
+    memset(password, 0, sizeof(password));
+    bytes_received = recv(client_fd, password, sizeof(password) - 1, 0);
+    if (bytes_received <= 0)
+    {
+        close(client_fd);
+        close(server_fd);
+        return;
+    }
+    if (verify_password(username, password))
+    {
+        send(client_fd, "AUTH_SUCCESS", 13, 0);
+        printf("User '%s' authenticated successfully.\n", username);
+    }
+    else
+    {
+        send(client_fd, "AUTH_FAIL", 9, 0);
+        printf("Authentication failed for user '%s'.\n", username);
+        close(client_fd);
+        close(server_fd);
+        return;
+    }
+    while (1)
+    {
+        int choice;
+        memset(&choice, 0, sizeof(choice));
+        if (recv(client_fd, &choice, sizeof(choice), 0) <= 0)
+        {
+            printf("Client disconnected.\n");
+            break;
+        }
+        if (choice == 1)
+        {
+            memset(buffer, 0, BUFFER_SIZE);
+            recv(client_fd, buffer, BUFFER_SIZE - 1, 0);
+            printf("\nMessage received from client: %s\n", buffer);
+            send(client_fd, buffer, strlen(buffer) + 1, 0);
+            printf("Server sent the message to client.\n");
+        }
+        else if (choice == 2)
+        {
+            memset(buffer, 0, BUFFER_SIZE);
+            recv(client_fd, buffer, BUFFER_SIZE - 1, 0);
+            printf("\nString received from client: %s\n", buffer);
+            if (is_palindrome(buffer))
+            {
+                send(client_fd, "Palindrome", strlen("Palindrome") + 1, 0);
+                printf("Result sent: Palindrome\n");
+            }
+            else
+            {
+                send(client_fd, "Not a Palindrome", strlen("Not a Palindrome") + 1, 0);
+                printf("Result sent: Not a Palindrome\n");
+            }
+        }
+        else if (choice == 3)
+        {
+            printf("\nClient requested exit.\n");
+            break;
+        }
+    }
+    close(client_fd);
+    close(server_fd);
+    printf("Server closed.\n");
+}
+void run_client(int port)
+{
+    int sock;
+    struct sockaddr_in serv_addr;
+    char username[50];
+    char *pass_ptr;
+    char buffer[BUFFER_SIZE];
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0)
+    {
+        printf("Socket creation error.\n");
+        return;
+    }
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
+    {
+        printf("Invalid address.\n");
+        close(sock);
+        return;
+    }
+    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+        printf("Connection failed.\n");
+        close(sock);
+        return;
+    }
+    printf("\n====================================\n");
+    printf(" CLIENT CONNECTED\n");
+    printf("====================================\n");
+    printf("\n---------- LOGIN ----------\n");
+    printf("Username: ");
+    scanf("%49s", username);
+    send(sock, username, strlen(username) + 1, 0);
+    memset(buffer, 0, BUFFER_SIZE);
+    recv(sock, buffer, BUFFER_SIZE - 1, 0);
+    if (strcmp(buffer, "USER_OK") != 0)
+    {
+        printf("\nAuthentication failed: Username not found.\n");
+        close(sock);
+        return;
+    }
+    pass_ptr = getpass("Password: ");
+    send(sock, pass_ptr, strlen(pass_ptr) + 1, 0);
+    memset(buffer, 0, BUFFER_SIZE);
+    recv(sock, buffer, BUFFER_SIZE - 1, 0);
+    if (strcmp(buffer, "AUTH_SUCCESS") != 0)
+    {
+        printf("\nAuthentication failed: Incorrect password.\n");
+        close(sock);
+        return;
+    }
+    printf("\nAuthentication successful!\n");
+    while (1)
+    {
+        int choice;
+        printf("\n====================================\n");
+        printf(" OPTIONS MENU\n");
+        printf("====================================\n");
+        printf("1. Echo\n");
+        printf("2. Palindrome Checking\n");
+        printf("3. Exit\n");
+        printf("====================================\n");
+        printf("Enter your choice: ");
+        if (scanf("%d", &choice) != 1)
+        {
+            printf("Invalid selection format.\n");
+            break;
+        }
+        send(sock, &choice, sizeof(choice), 0);
+        if (choice == 1)
+        {
+            getchar();
+            printf("\nEnter text for Echo: ");
+            fgets(buffer, BUFFER_SIZE, stdin);
+            buffer[strcspn(buffer, "\n")] = '\0';
+            send(sock, buffer, strlen(buffer) + 1, 0);
+            memset(buffer, 0, BUFFER_SIZE);
+            recv(sock, buffer, BUFFER_SIZE - 1, 0);
+            printf("Server Echo: %s\n", buffer);
+        }
+        else if (choice == 2)
+        {
+            getchar();
+            printf("\nEnter string to check: ");
+            fgets(buffer, BUFFER_SIZE, stdin);
+            buffer[strcspn(buffer, "\n")] = '\0';
+            send(sock, buffer, strlen(buffer) + 1, 0);
+            memset(buffer, 0, BUFFER_SIZE);
+            recv(sock, buffer, BUFFER_SIZE - 1, 0);
+            printf("Result: %s\n", buffer);
+        }
+        else if (choice == 3)
+        {
+            printf("\nExiting client...\n");
+            break;
+        }
+        else
+        {
+            printf("\nInvalid choice!\n");
+        }
+    }
+    close(sock);
+    printf("Client closed.\n");
+}
+int main(int argc, char *argv[])
+{
+    int current_port = DEFAULT_PORT;
+    if (argc == 2)
+    {
+        current_port = atoi(argv[1]);
+    }
+    run_client(current_port);
+    return 0;
+}
+
+[24bcs005@mepcolinux ex6]$cat o.txt
+[24bcs005@mepcolinux ex6]$./1
+
+====================================
+ CLIENT CONNECTED
+====================================
+
+---------- LOGIN ----------
+Username: admin
+Password:
+
+Authentication successful!
+
+====================================
+ OPTIONS MENU
+====================================
+1. Echo
+2. Palindrome Checking
+3. Exit
+====================================
+Enter your choice: 1
+
+Enter text for Echo: hello
+Server Echo: hello
+
+====================================
+ OPTIONS MENU
+====================================
+1. Echo
+2. Palindrome Checking
+3. Exit
+====================================
+Enter your choice: 2
+
+Enter string to check: mom
+Result: Palindrome
+
+====================================
+ OPTIONS MENU
+====================================
+1. Echo
+2. Palindrome Checking
+3. Exit
+====================================
+Enter your choice: 3
+
+Exiting client...
+Client closed.
+[24bcs005@mepcolinux ex6]$./1
+
+====================================
+ CLIENT CONNECTED
+====================================
+
+---------- LOGIN ----------
+Username: ad
+
+Authentication failed: Username not found.
+[24bcs005@mepcolinux ex6]$./1
+
+====================================
+ CLIENT CONNECTED
+====================================
+
+---------- LOGIN ----------
+Username: admin
+Password:
+
+Authentication failed: Incorrect password.
+[24bcs005@mepcolinux ex6]$
+[24bcs005@mepcolinux ex6]$exit
+exit
+
+Script done on Wed Oct  7 15:20:16 2026
+[24bcs005@mepcolinux ex6]$
